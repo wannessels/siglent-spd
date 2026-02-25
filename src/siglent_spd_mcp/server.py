@@ -4,7 +4,7 @@ import os
 import time
 
 from mcp.server.fastmcp import FastMCP
-from scpi_connection import SCPIConnection
+from siglent_spd_mcp.scpi_connection import SCPIConnection
 
 HOST = os.environ.get("SPD_HOST", "192.168.30.134")
 PORT = int(os.environ.get("SPD_PORT", "5025"))
@@ -665,5 +665,9 @@ async def get_monitor_data(monitor_id: str) -> str:
 
 # ---------------------------------------------------------------------------
 
+def main():
+    mcp.run(transport="stdio")
+
+
 if __name__ == "__main__":
-    mcp.run()
+    main()
