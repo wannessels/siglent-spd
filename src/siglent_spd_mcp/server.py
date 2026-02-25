@@ -4,6 +4,7 @@ import os
 import time
 
 from mcp.server.fastmcp import FastMCP
+
 from siglent_spd_mcp.scpi_connection import SCPIConnection
 
 HOST = os.environ.get("SPD_HOST", "192.168.30.134")
