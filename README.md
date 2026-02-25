@@ -19,7 +19,7 @@ with environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SPD_HOST` | `192.168.30.134` | IP address of the power supply |
+| `SPD_HOST` | *(required)* | IP address of the power supply |
 | `SPD_PORT` | `5025` | SCPI TCP port |
 
 ### Permissions (default: readonly)

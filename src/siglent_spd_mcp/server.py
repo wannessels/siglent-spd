@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 from siglent_spd_mcp.scpi_connection import SCPIConnection
 
-HOST = os.environ.get("SPD_HOST", "192.168.30.134")
+HOST = os.environ["SPD_HOST"]
 PORT = int(os.environ.get("SPD_PORT", "5025"))
 
 mcp = FastMCP("siglent-spd")
