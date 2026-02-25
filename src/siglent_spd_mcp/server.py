@@ -7,11 +7,18 @@ from mcp.server.fastmcp import FastMCP
 
 from siglent_spd_mcp.scpi_connection import SCPIConnection
 
-HOST = os.environ["SPD_HOST"]
-PORT = int(os.environ.get("SPD_PORT", "5025"))
-
 mcp = FastMCP("siglent-spd")
-conn = SCPIConnection(HOST, PORT)
+conn: SCPIConnection | None = None
+
+
+def _get_conn() -> SCPIConnection:
+    global conn
+    if conn is None:
+        host = os.environ["SPD_HOST"]
+        port = int(os.environ.get("SPD_PORT", "5025"))
+        conn = SCPIConnection(host, port)
+    return conn
+
 
 # Background monitor state
 _monitors: dict = {}
@@ -94,8 +101,8 @@ def _check_both(channel: str, voltage: float, current: float) -> list[str]:
 
 async def _query_and_check_channel(channel: str) -> list[str]:
     """Query a channel's setpoints and return any limit violations."""
-    v = float(await conn.query(f"{channel}:VOLTage?"))
-    i = float(await conn.query(f"{channel}:CURRent?"))
+    v = float(await _get_conn().query(f"{channel}:VOLTage?"))
+    i = float(await _get_conn().query(f"{channel}:CURRent?"))
     return _check_both(channel, v, i)
 
 
@@ -132,7 +139,7 @@ async def get_safety_config() -> str:
 async def identify() -> str:
     """Query instrument identification (manufacturer, model, serial, firmware, hardware version)."""
 
-    return await conn.query("*IDN?")
+    return await _get_conn().query("*IDN?")
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +156,7 @@ async def save_state(slot: int) -> str:
         return err
     if slot < 1 or slot > 5:
         return "Error: slot must be 1-5"
-    await conn.write(f"*SAV {slot}")
+    await _get_conn().write(f"*SAV {slot}")
     return f"State saved to slot {slot}"
 
 
@@ -167,7 +174,7 @@ async def recall_state(slot: int) -> str:
         return err
     if slot < 1 or slot > 5:
         return "Error: slot must be 1-5"
-    await conn.write(f"*RCL {slot}")
+    await _get_conn().write(f"*RCL {slot}")
     await asyncio.sleep(0.5)
 
     # Check channels that have safety limits configured
@@ -183,7 +190,7 @@ async def recall_state(slot: int) -> str:
         except Exception:
             continue  # channel may not support setpoint queries
         if errors:
-            await conn.write(f"OUTPut {ch},OFF")
+            await _get_conn().write(f"OUTPut {ch},OFF")
             await asyncio.sleep(0.1)
             warnings.append(f"{ch} output DISABLED: {'; '.join(errors)}")
 
@@ -203,7 +210,7 @@ async def measure_voltage(channel: str = "CH1") -> str:
 
     ch = channel.upper()
 
-    return await conn.query(f"MEASure:VOLTage? {ch}")
+    return await _get_conn().query(f"MEASure:VOLTage? {ch}")
 
 
 @mcp.tool()
@@ -212,7 +219,7 @@ async def measure_current(channel: str = "CH1") -> str:
 
     ch = channel.upper()
 
-    return await conn.query(f"MEASure:CURRent? {ch}")
+    return await _get_conn().query(f"MEASure:CURRent? {ch}")
 
 
 @mcp.tool()
@@ -221,7 +228,7 @@ async def measure_power(channel: str = "CH1") -> str:
 
     ch = channel.upper()
 
-    return await conn.query(f"MEASure:POWEr? {ch}")
+    return await _get_conn().query(f"MEASure:POWEr? {ch}")
 
 
 @mcp.tool()
@@ -230,9 +237,9 @@ async def measure_all(channel: str = "CH1") -> str:
 
     ch = channel.upper()
 
-    v = await conn.query(f"MEASure:VOLTage? {ch}")
-    i = await conn.query(f"MEASure:CURRent? {ch}")
-    p = await conn.query(f"MEASure:POWEr? {ch}")
+    v = await _get_conn().query(f"MEASure:VOLTage? {ch}")
+    i = await _get_conn().query(f"MEASure:CURRent? {ch}")
+    p = await _get_conn().query(f"MEASure:POWEr? {ch}")
     return json.dumps({"channel": ch, "voltage": v, "current": i, "power": p})
 
 
@@ -255,7 +262,7 @@ async def set_voltage(channel: str, voltage: float) -> str:
     err = _check_voltage(ch, voltage)
     if err:
         return f"REFUSED: {err}"
-    await conn.write(f"{ch}:VOLTage {voltage}")
+    await _get_conn().write(f"{ch}:VOLTage {voltage}")
     return f"Set {ch} voltage to {voltage} V"
 
 
@@ -265,7 +272,7 @@ async def get_voltage(channel: str = "CH1") -> str:
 
     ch = channel.upper()
 
-    return await conn.query(f"{ch}:VOLTage?")
+    return await _get_conn().query(f"{ch}:VOLTage?")
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +294,7 @@ async def set_current(channel: str, current: float) -> str:
     err = _check_current(ch, current)
     if err:
         return f"REFUSED: {err}"
-    await conn.write(f"{ch}:CURRent {current}")
+    await _get_conn().write(f"{ch}:CURRent {current}")
     return f"Set {ch} current to {current} A"
 
 
@@ -297,7 +304,7 @@ async def get_current(channel: str = "CH1") -> str:
 
     ch = channel.upper()
 
-    return await conn.query(f"{ch}:CURRent?")
+    return await _get_conn().query(f"{ch}:CURRent?")
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +337,7 @@ async def set_output(channel: str, state: str) -> str:
         except Exception:
             pass  # channel may not support setpoint queries (e.g. output-only)
 
-    await conn.write(f"OUTPut {ch},{st}")
+    await _get_conn().write(f"OUTPut {ch},{st}")
     return f"{ch} output {st}"
 
 
@@ -346,7 +353,7 @@ async def set_tracking_mode(mode: int) -> str:
             return err
     if mode not in (0, 1, 2):
         return "Error: mode must be 0 (independent), 1 (series), or 2 (parallel)"
-    await conn.write(f"OUTPut:TRACK {mode}")
+    await _get_conn().write(f"OUTPut:TRACK {mode}")
     labels = {0: "independent", 1: "series", 2: "parallel"}
     return f"Tracking mode set to {labels[mode]}"
 
@@ -358,7 +365,7 @@ async def set_waveform_display(channel: str, state: str) -> str:
     ch = channel.upper()
 
     st = state.upper()
-    await conn.write(f"OUTPut:WAVE {ch},{st}")
+    await _get_conn().write(f"OUTPut:WAVE {ch},{st}")
     return f"{ch} waveform display {st}"
 
 
@@ -383,7 +390,7 @@ async def set_timer(channel: str, group: int, voltage: float, current: float, ti
     errors = _check_both(ch, voltage, current)
     if errors:
         return f"REFUSED: {'; '.join(errors)}"
-    await conn.write(f"TIMEr:SET {ch},{group},{voltage},{current},{time_s}")
+    await _get_conn().write(f"TIMEr:SET {ch},{group},{voltage},{current},{time_s}")
     return f"Timer {ch} group {group}: {voltage}V, {current}A, {time_s}s"
 
 
@@ -395,7 +402,7 @@ async def get_timer(channel: str, group: int) -> str:
 
     if group < 1 or group > 5:
         return "Error: group must be 1-5"
-    return await conn.query(f"TIMEr:SET? {ch},{group}")
+    return await _get_conn().query(f"TIMEr:SET? {ch},{group}")
 
 
 @mcp.tool()
@@ -408,7 +415,7 @@ async def set_timer_state(channel: str, state: str) -> str:
     if err:
         return err
     st = state.upper()
-    await conn.write(f"TIMEr {ch},{st}")
+    await _get_conn().write(f"TIMEr {ch},{st}")
     return f"{ch} timer {st}"
 
 
@@ -421,7 +428,7 @@ async def set_timer_state(channel: str, state: str) -> str:
 async def get_system_status() -> str:
     """Query system status with decoded bit flags (output state, CV/CC mode, tracking, timers, display)."""
 
-    raw = await conn.query("SYSTem:STATus?")
+    raw = await _get_conn().query("SYSTem:STATus?")
     try:
         val = int(raw, 16)
         tracking_bits = (val >> 2) & 0x03
@@ -447,14 +454,14 @@ async def get_system_status() -> str:
 async def get_error() -> str:
     """Query the error code and information."""
 
-    return await conn.query("SYSTem:ERRor?")
+    return await _get_conn().query("SYSTem:ERRor?")
 
 
 @mcp.tool()
 async def get_version() -> str:
     """Query the software version."""
 
-    return await conn.query("SYSTem:VERSion?")
+    return await _get_conn().query("SYSTem:VERSion?")
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +476,7 @@ async def set_ip(ip: str) -> str:
     err = _require_write("NETWORK")
     if err:
         return err
-    await conn.write(f"IPaddr {ip}")
+    await _get_conn().write(f"IPaddr {ip}")
     return f"IP set to {ip}"
 
 
@@ -477,7 +484,7 @@ async def set_ip(ip: str) -> str:
 async def get_ip() -> str:
     """Query current IP address."""
 
-    return await conn.query("IPaddr?")
+    return await _get_conn().query("IPaddr?")
 
 
 @mcp.tool()
@@ -487,7 +494,7 @@ async def set_mask(mask: str) -> str:
     err = _require_write("NETWORK")
     if err:
         return err
-    await conn.write(f"MASKaddr {mask}")
+    await _get_conn().write(f"MASKaddr {mask}")
     return f"Subnet mask set to {mask}"
 
 
@@ -495,7 +502,7 @@ async def set_mask(mask: str) -> str:
 async def get_mask() -> str:
     """Query current subnet mask."""
 
-    return await conn.query("MASKaddr?")
+    return await _get_conn().query("MASKaddr?")
 
 
 @mcp.tool()
@@ -505,7 +512,7 @@ async def set_gateway(gateway: str) -> str:
     err = _require_write("NETWORK")
     if err:
         return err
-    await conn.write(f"GATEaddr {gateway}")
+    await _get_conn().write(f"GATEaddr {gateway}")
     return f"Gateway set to {gateway}"
 
 
@@ -513,7 +520,7 @@ async def set_gateway(gateway: str) -> str:
 async def get_gateway() -> str:
     """Query current gateway."""
 
-    return await conn.query("GATEaddr?")
+    return await _get_conn().query("GATEaddr?")
 
 
 @mcp.tool()
@@ -524,7 +531,7 @@ async def set_dhcp(state: str) -> str:
     if err:
         return err
     st = state.upper()
-    await conn.write(f"DHCP {st}")
+    await _get_conn().write(f"DHCP {st}")
     return f"DHCP {st}"
 
 
@@ -532,7 +539,7 @@ async def set_dhcp(state: str) -> str:
 async def get_dhcp() -> str:
     """Query DHCP status."""
 
-    return await conn.query("DHCP?")
+    return await _get_conn().query("DHCP?")
 
 
 # ---------------------------------------------------------------------------
@@ -566,11 +573,11 @@ async def monitor(
         reading = {"time": round(time.time() - start_time, 3)}
         try:
             if voltage:
-                reading["voltage"] = float(await conn.query(f"MEASure:VOLTage? {ch}"))
+                reading["voltage"] = float(await _get_conn().query(f"MEASure:VOLTage? {ch}"))
             if current:
-                reading["current"] = float(await conn.query(f"MEASure:CURRent? {ch}"))
+                reading["current"] = float(await _get_conn().query(f"MEASure:CURRent? {ch}"))
             if power:
-                reading["power"] = float(await conn.query(f"MEASure:POWEr? {ch}"))
+                reading["power"] = float(await _get_conn().query(f"MEASure:POWEr? {ch}"))
         except Exception as e:
             reading["error"] = str(e)
         data.append(reading)
@@ -594,11 +601,11 @@ async def _monitor_loop(monitor_id: str):
         reading = {"time": round(time.time() - start_time, 3)}
         try:
             if mon["voltage"]:
-                reading["voltage"] = float(await conn.query(f"MEASure:VOLTage? {mon['channel']}"))
+                reading["voltage"] = float(await _get_conn().query(f"MEASure:VOLTage? {mon['channel']}"))
             if mon["current"]:
-                reading["current"] = float(await conn.query(f"MEASure:CURRent? {mon['channel']}"))
+                reading["current"] = float(await _get_conn().query(f"MEASure:CURRent? {mon['channel']}"))
             if mon["power"]:
-                reading["power"] = float(await conn.query(f"MEASure:POWEr? {mon['channel']}"))
+                reading["power"] = float(await _get_conn().query(f"MEASure:POWEr? {mon['channel']}"))
         except Exception as e:
             reading["error"] = str(e)
         mon["data"].append(reading)
