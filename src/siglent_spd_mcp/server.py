@@ -127,6 +127,7 @@ async def get_safety_config() -> str:
 # Identity
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 async def identify() -> str:
     """Query instrument identification (manufacturer, model, serial, firmware, hardware version)."""
@@ -137,6 +138,7 @@ async def identify() -> str:
 # ---------------------------------------------------------------------------
 # Save / Recall
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 async def save_state(slot: int) -> str:
@@ -194,6 +196,7 @@ async def recall_state(slot: int) -> str:
 # ---------------------------------------------------------------------------
 # Measure (actual readings)# ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 async def measure_voltage(channel: str = "CH1") -> str:
     """Measure actual output voltage on a channel."""
@@ -236,6 +239,7 @@ async def measure_all(channel: str = "CH1") -> str:
 # ---------------------------------------------------------------------------
 # Voltage setpoint# ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 async def set_voltage(channel: str, voltage: float) -> str:
     """Set voltage setpoint for a channel (e.g. channel=CH1, voltage=3.3).
@@ -266,6 +270,7 @@ async def get_voltage(channel: str = "CH1") -> str:
 
 # ---------------------------------------------------------------------------
 # Current setpoint# ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 async def set_current(channel: str, current: float) -> str:
@@ -298,6 +303,7 @@ async def get_current(channel: str = "CH1") -> str:
 # ---------------------------------------------------------------------------
 # Output control — all channels (full + output-only)
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 async def set_output(channel: str, state: str) -> str:
@@ -359,6 +365,7 @@ async def set_waveform_display(channel: str, state: str) -> str:
 # ---------------------------------------------------------------------------
 # Timer# ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 async def set_timer(channel: str, group: int, voltage: float, current: float, time_s: float) -> str:
     """Set timer parameters for a channel group (group 1-5, voltage in V, current in A, time in seconds).
@@ -409,6 +416,7 @@ async def set_timer_state(channel: str, state: str) -> str:
 # System
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 async def get_system_status() -> str:
     """Query system status with decoded bit flags (output state, CV/CC mode, tracking, timers, display)."""
@@ -452,6 +460,7 @@ async def get_version() -> str:
 # ---------------------------------------------------------------------------
 # Network configuration
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 async def set_ip(ip: str) -> str:
@@ -530,6 +539,7 @@ async def get_dhcp() -> str:
 # Monitor — fixed duration (full channels only)
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 async def monitor(
     channel: str = "CH1",
@@ -573,6 +583,7 @@ async def monitor(
 # ---------------------------------------------------------------------------
 # Monitor — open-ended (start/stop/get)# ---------------------------------------------------------------------------
 
+
 async def _monitor_loop(monitor_id: str):
     mon = _monitors[monitor_id]
     interval = mon["interval_ms"] / 1000.0
@@ -583,17 +594,11 @@ async def _monitor_loop(monitor_id: str):
         reading = {"time": round(time.time() - start_time, 3)}
         try:
             if mon["voltage"]:
-                reading["voltage"] = float(
-                    await conn.query(f"MEASure:VOLTage? {mon['channel']}")
-                )
+                reading["voltage"] = float(await conn.query(f"MEASure:VOLTage? {mon['channel']}"))
             if mon["current"]:
-                reading["current"] = float(
-                    await conn.query(f"MEASure:CURRent? {mon['channel']}")
-                )
+                reading["current"] = float(await conn.query(f"MEASure:CURRent? {mon['channel']}"))
             if mon["power"]:
-                reading["power"] = float(
-                    await conn.query(f"MEASure:POWEr? {mon['channel']}")
-                )
+                reading["power"] = float(await conn.query(f"MEASure:POWEr? {mon['channel']}"))
         except Exception as e:
             reading["error"] = str(e)
         mon["data"].append(reading)
@@ -659,12 +664,11 @@ async def get_monitor_data(monitor_id: str) -> str:
     mon = _monitors[monitor_id]
     data = list(mon["data"])
 
-    return json.dumps(
-        {"monitor_id": monitor_id, "running": mon["running"], "samples": len(data), "readings": data}
-    )
+    return json.dumps({"monitor_id": monitor_id, "running": mon["running"], "samples": len(data), "readings": data})
 
 
 # ---------------------------------------------------------------------------
+
 
 def main():
     mcp.run(transport="stdio")
