@@ -338,6 +338,32 @@ async def set_output(channel: str, state: str) -> str:
             pass  # channel may not support setpoint queries (e.g. output-only)
 
     await _get_conn().write(f"OUTPut {ch},{st}")
+
+    if st == "ON":
+        try:
+            conn = _get_conn()
+            voltage = await conn.query(f"MEASure:VOLTage? {ch}")
+            current = await conn.query(f"MEASure:CURRent? {ch}")
+            raw = await conn.query("SYSTem:STATus?")
+            mode = "unknown"
+            try:
+                val = int(raw, 16)
+                bit = {"CH1": 0x01, "CH2": 0x02}.get(ch)
+                if bit is not None:
+                    mode = "CC" if val & bit else "CV"
+            except ValueError:
+                pass
+            result = {
+                "channel": ch,
+                "output": "ON",
+                "voltage": voltage,
+                "current": current,
+                "mode": mode,
+            }
+            return json.dumps(result)
+        except Exception:
+            return f"{ch} output ON"
+
     return f"{ch} output {st}"
 
 
