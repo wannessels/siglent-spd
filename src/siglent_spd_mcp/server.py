@@ -341,6 +341,7 @@ async def set_output(channel: str, state: str) -> str:
 
     if st == "ON":
         try:
+            await asyncio.sleep(0.1)
             conn = _get_conn()
             voltage = await conn.query(f"MEASure:VOLTage? {ch}")
             current = await conn.query(f"MEASure:CURRent? {ch}")
@@ -701,6 +702,17 @@ async def get_monitor_data(monitor_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def disconnect() -> str:
+    """Close the SCPI connection to the power supply, freeing the TCP port for other clients."""
+    global conn
+    if conn is None:
+        return "No active connection"
+    await conn.disconnect()
+    conn = None
+    return "Disconnected"
 
 
 def main():
