@@ -341,6 +341,7 @@ async def set_output(channel: str, state: str) -> str:
 
     if st == "ON":
         try:
+            await asyncio.sleep(0.1)
             conn = _get_conn()
             voltage = await conn.query(f"MEASure:VOLTage? {ch}")
             current = await conn.query(f"MEASure:CURRent? {ch}")
