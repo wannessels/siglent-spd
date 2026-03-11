@@ -703,6 +703,17 @@ async def get_monitor_data(monitor_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+@mcp.tool()
+async def disconnect() -> str:
+    """Close the SCPI connection to the power supply, freeing the TCP port for other clients."""
+    global conn
+    if conn is None:
+        return "No active connection"
+    await conn.disconnect()
+    conn = None
+    return "Disconnected"
+
+
 def main():
     mcp.run(transport="stdio")
 
