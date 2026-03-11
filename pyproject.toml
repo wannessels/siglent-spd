@@ -1,6 +1,6 @@
 [project]
 name = "siglent-spd-mcp"
-version = "0.1.2"
+dynamic = ["version"]
 description = "MCP server for Siglent SPD series programmable DC power supplies"
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -30,8 +30,11 @@ Repository = "https://github.com/wannessels/siglent-spd-mcp"
 Issues = "https://github.com/wannessels/siglent-spd-mcp/issues"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/siglent_spd_mcp"]
